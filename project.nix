@@ -2,7 +2,7 @@
 , cabal-install, unordered-containers }:
 mkDerivation {
   pname = "semver-range";
-  version = "0.1.0";
+  version = "0.1.1";
   src = ./.;
   isLibrary = true;
   buildDepends = [ base classy-prelude parsec text cabal-install

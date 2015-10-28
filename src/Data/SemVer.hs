@@ -64,6 +64,16 @@ tuplesOf = map toTuple . versionsOf
 rangeReleaseTags :: SemVerRange -> [ReleaseTag]
 rangeReleaseTags = concatMap releaseTags . versionsOf
 
+-- | Get the range release tags if they're all the same; otherwise
+-- Nothing.
+sharedReleaseTags :: SemVerRange -> Maybe [ReleaseTag]
+sharedReleaseTags range = case map releaseTags $ versionsOf range of
+  [] -> Nothing -- shouldn't happen but in case
+  []:_ -> Nothing -- no release tags, so that seals it
+  tagList:otherLists
+    | all (== tagList) otherLists -> Just tagList
+    | otherwise -> Nothing
+
 -- | Satisfies any version.
 anyVersion :: SemVerRange
 anyVersion = Gt $ semver 0 0 0
@@ -92,18 +102,15 @@ instance Show SemVerRange where
 -- Note that there are special cases when there are release tags. For detauls
 -- see https://github.com/npm/node-semver#prerelease-tags.
 matches :: SemVerRange -> SemVer -> Bool
-matches range ver = case (rangeReleaseTags range, releaseTags ver) of
+matches range version = case (sharedReleaseTags range, releaseTags version) of
   -- This is the simple case, where neither the range nor the version has given
   -- any release tags. Then we can just do regular predicate calculus.
-  ([], []) -> matchesSimple range ver
-  -- If the version has release tags but the range doesn't, it's not a match.
-  ([], _) -> False
-  -- If the version has release tags but none of the comparators have the same
-  -- (major, minor, patch) tuples, it's not a match. For now, we're being even
-  -- more strict, saying that there has to be exactly one comparator as well.
-  (_, _) | tuplesOf range /= [toTuple ver] -> False
-  -- If they have the same tuples, we can compare the version tags.
-  (rTags, vTags) -> matchesTags range rTags vTags
+  (Nothing, []) -> matchesSimple range version
+  (Just rTags, vTags)
+    | rTags == vTags -> matchesSimple range version
+    | tuplesOf range /= [toTuple version] -> False
+    | otherwise -> matchesTags range rTags vTags
+  (_, _) -> False
 
 -- | Simple predicate calculus matching, doing AND and OR combination with
 -- numerical comparison.

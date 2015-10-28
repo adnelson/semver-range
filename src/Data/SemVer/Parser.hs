@@ -3,7 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Data.SemVer.Parser (
     parseSemVer, parseSemVerRange, pSemVerRange, pSemVer,
-    fromHaskellVersion
+    fromHaskellVersion, matchText
   ) where
 
 import qualified Prelude as P
@@ -107,7 +107,7 @@ pWildCard = try $ do
       tag = fmap pack $ many1 $ letter <|> digit <|> char '-'
   -- Versions can optionally start with the character 'v'
   optional (char 'v')
-  takeWhile isJust <$> sepBy1 bound (sstring ".") >>= \case
+  res <- takeWhile isJust <$> sepBy1 bound (sstring ".") >>= \case
     [] -> return Any
     [Just n] -> return $ One n
     [Just n, Just m] -> return $ Two n m
@@ -116,6 +116,7 @@ pWildCard = try $ do
       tags <- tag `sepBy1` char '.'
       return $ Three n m o tags
     w -> unexpected ("Invalid version " ++ show w)
+  spaces *> return res
 
 -- | Parses a tilde range (~1.2.3).
 pTildeRange :: Parser Wildcard
@@ -143,3 +144,12 @@ fromHaskellVersion v = case versionBranch v of
   bad -> do
     let badVer = intercalate "." (map show bad)
     Left $ pack ("Not a SemVer version: " <> badVer)
+
+-- | Parses the first argument as a range and the second argument as a semver,
+-- and returns whether they match.
+matchText :: Text -> Text -> Either Text Bool
+matchText rangeTxt verTxt = case parseSemVerRange rangeTxt of
+  Left err -> Left ("Could not parse range: " <> pack (show err))
+  Right range -> case parseSemVer verTxt of
+    Left err -> Left ("Could not parse version: " <> pack (show err))
+    Right version -> Right $ matches range version
