@@ -7,8 +7,8 @@ module Data.SemVer.Parser (
   ) where
 
 import qualified Prelude as P
-import ClassyPrelude hiding (try)
-import Text.Parsec hiding ((<|>), spaces, parse, State, uncons)
+import ClassyPrelude hiding (try, many)
+import Text.Parsec hiding ((<|>), spaces, parse, State, uncons, optional)
 import qualified Text.Parsec as Parsec
 
 import Data.Version (Version(..))
