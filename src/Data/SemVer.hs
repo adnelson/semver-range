@@ -12,7 +12,21 @@ type ReleaseTag = Text
 
 -- | A SemVer has major, minor and patch versions, and zero or more
 -- pre-release version tags.
-type SemVer = (Int, Int, Int, [ReleaseTag])
+data SemVer = SemVer {
+  svMajor :: !Int,
+  svMinor :: !Int,
+  svPatch :: !Int,
+  svReleaseTags :: ![ReleaseTag]
+  } deriving (Eq, Ord)
+
+instance Show SemVer where
+  show (SemVer x y z []) = show x <> "." <> show y <> "." <> show z
+  show (SemVer x y z tags) = show (semver x y z) <> "-" <>
+                              (intercalate "." $ map unpack tags)
+
+instance Hashable SemVer where
+  hashWithSalt salt (SemVer major minor patch tags) =
+    hashWithSalt salt (major, minor, patch, tags)
 
 -- | A partially specified semantic version. Implicitly defines
 -- a range of acceptable versions, as seen in @wildcardToRange@.
@@ -46,15 +60,11 @@ versionsOf = \case
 
 -- | Create a SemVer with no version tags.
 semver :: Int -> Int -> Int -> SemVer
-semver a b c = (a, b, c, [])
-
--- | Get the release tags from a semver.
-releaseTags :: SemVer -> [ReleaseTag]
-releaseTags (_, _, _, tags) = tags
+semver a b c = SemVer a b c []
 
 -- | Get only the version tuple from a semver.
 toTuple :: SemVer -> (Int, Int, Int)
-toTuple (a, b, c, _) = (a, b, c)
+toTuple (SemVer a b c _) = (a, b, c)
 
 -- | Get a list of tuples from a version range.
 tuplesOf :: SemVerRange -> [(Int, Int, Int)]
@@ -62,12 +72,12 @@ tuplesOf = map toTuple . versionsOf
 
 -- | Get all of the release tags from a version range.
 rangeReleaseTags :: SemVerRange -> [ReleaseTag]
-rangeReleaseTags = concatMap releaseTags . versionsOf
+rangeReleaseTags = concatMap svReleaseTags . versionsOf
 
 -- | Get the range release tags if they're all the same; otherwise
 -- Nothing.
 sharedReleaseTags :: SemVerRange -> Maybe [ReleaseTag]
-sharedReleaseTags range = case map releaseTags $ versionsOf range of
+sharedReleaseTags range = case map svReleaseTags $ versionsOf range of
   [] -> Nothing -- shouldn't happen but in case
   []:_ -> Nothing -- no release tags, so that seals it
   tagList:otherLists
@@ -76,25 +86,20 @@ sharedReleaseTags range = case map releaseTags $ versionsOf range of
 
 -- | Satisfies any version.
 anyVersion :: SemVerRange
-anyVersion = Gt $ semver 0 0 0
+anyVersion = Geq $ semver 0 0 0
 
 -- | Render a semver as Text.
 renderSV :: SemVer -> Text
-renderSV = pack . renderSV'
+renderSV = pack . show
 
--- | Render a semver as a String.
-renderSV' :: SemVer -> String
-renderSV' (x, y, z, []) = show x <> "." <> show y <> "." <> show z
-renderSV' (x, y, z, tags) = renderSV' (x, y, z, []) <> "-" <>
-                              (intercalate "." $ map unpack tags)
 
 instance Show SemVerRange where
   show = \case
-    Eq sv -> "=" <> renderSV' sv
-    Gt sv -> ">" <> renderSV' sv
-    Lt sv -> "<" <> renderSV' sv
-    Geq sv -> ">=" <> renderSV' sv
-    Leq sv -> "<=" <> renderSV' sv
+    Eq sv -> "=" <> show sv
+    Gt sv -> ">" <> show sv
+    Lt sv -> "<" <> show sv
+    Geq sv -> ">=" <> show sv
+    Leq sv -> "<=" <> show sv
     And svr1 svr2 -> show svr1 <> " " <> show svr2
     Or svr1 svr2 -> show svr1 <> " || " <> show svr2
 
@@ -102,7 +107,7 @@ instance Show SemVerRange where
 -- Note that there are special cases when there are release tags. For detauls
 -- see https://github.com/npm/node-semver#prerelease-tags.
 matches :: SemVerRange -> SemVer -> Bool
-matches range version = case (sharedReleaseTags range, releaseTags version) of
+matches range version = case (sharedReleaseTags range, svReleaseTags version) of
   -- This is the simple case, where neither the range nor the version has given
   -- any release tags. Then we can just do regular predicate calculus.
   (Nothing, []) -> matchesSimple range version
@@ -147,20 +152,20 @@ bestMatch range vs = case filter (matches range) vs of
 
 -- | Fills in zeros in a wildcard.
 wildcardToSemver :: Wildcard -> SemVer
-wildcardToSemver Any = (0, 0, 0, [])
-wildcardToSemver (One n) = (n, 0, 0, [])
-wildcardToSemver (Two n m) = (n, m, 0, [])
-wildcardToSemver (Three n m o tags) = (n, m, o, tags)
+wildcardToSemver Any = semver 0 0 0
+wildcardToSemver (One n) = semver n 0 0
+wildcardToSemver (Two n m) = semver n m 0
+wildcardToSemver (Three n m o tags) = SemVer n m o tags
 
 -- | Translates a wildcard (partially specified version) to a range.
 -- Ex: 2 := >=2.0.0 <3.0.0
 -- Ex: 1.2.x := 1.2 := >=1.2.0 <1.3.0
 wildcardToRange :: Wildcard -> SemVerRange
 wildcardToRange = \case
-  Any -> Geq (0, 0, 0, [])
-  One n -> Geq (n, 0, 0, []) `And` Lt (n+1, 0, 0, [])
-  Two n m -> Geq (n, m, 0, []) `And` Lt (n, m + 1, 0, [])
-  Three n m o tags -> Eq (n, m, o, tags)
+  Any -> Geq $ semver 0 0 0
+  One n -> Geq (semver n 0 0) `And` Lt (semver (n+1) 0 0)
+  Two n m -> Geq (semver n m 0) `And` Lt (semver n (m+1) 0)
+  Three n m o tags -> Eq (SemVer n m o tags)
 
 -- | Translates a ~wildcard to a range.
 -- Ex: ~1.2.3 := >=1.2.3 <1.(2+1).0 := >=1.2.3 <1.3.0
@@ -169,17 +174,17 @@ tildeToRange = \case
   Any -> tildeToRange (Three 0 0 0 [])
   One n -> tildeToRange (Three n 0 0 [])
   Two n m -> tildeToRange (Three n m 0 [])
-  Three n m o tags -> And (Geq (n, m, o, tags)) (Lt (n, m + 1, 0, tags))
+  Three n m o tags -> Geq (SemVer n m o tags) `And` Lt (SemVer n (m+1) 0 tags)
 
 -- | Translates a ^wildcard to a range.
 -- Ex: ^1.2.x := >=1.2.0 <2.0.0
 caratToRange :: Wildcard -> SemVerRange
 caratToRange = \case
-  One n -> And (Geq (n, 0, 0, [])) (Lt (n+1, 0, 0, []))
-  Two n m -> And (Geq (n, m, 0, [])) (Lt (n+1, 0, 0, []))
-  Three 0 0 n tags -> Eq (0, 0, n, tags)
-  Three 0 n m tags -> And (Geq (0, n, m, tags)) (Lt (0, n + 1, 0, tags))
-  Three n m o tags -> And (Geq (n, m, o, tags)) (Lt (n+1, 0, 0, tags))
+  One n -> Geq (semver n 0 0) `And` Lt (semver (n+1) 0 0)
+  Two n m -> Geq (semver n m 0) `And` Lt (semver (n+1) 0 0)
+  Three 0 0 n tags -> Eq (SemVer 0 0 n tags)
+  Three 0 n m tags -> Geq (SemVer 0 n m tags) `And` Lt (SemVer 0 (n+1) 0 tags)
+  Three n m o tags -> Geq (SemVer n m o tags) `And` Lt (SemVer (n+1) 0 0 tags)
 
 -- | Translates two hyphenated wildcards to an actual range.
 -- Ex: 1.2.3 - 2.3.4 := >=1.2.3 <=2.3.4
@@ -187,11 +192,11 @@ caratToRange = \case
 -- Ex: 1.2.3 - 2 := >=1.2.3 <3.0.0
 hyphenatedRange :: Wildcard -> Wildcard -> SemVerRange
 hyphenatedRange wc1 wc2 = And sv1 sv2 where
-  sv1 = case wc1 of Any -> Geq (0, 0, 0, [])
-                    One n -> Geq (n, 0, 0, [])
-                    Two n m -> Geq (n, m, 0, [])
-                    Three n m o tags -> Geq (n, m, o, tags)
-  sv2 = case wc2 of Any -> Geq (0, 0, 0, []) -- Refers to "any version"
-                    One n -> Lt (n+1, 0, 0, [])
-                    Two n m -> Lt (n, m + 1, 0, [])
-                    Three n m o tags -> Leq (n, m, o, tags)
+  sv1 = case wc1 of Any -> anyVersion
+                    One n -> Geq (semver n 0 0)
+                    Two n m -> Geq (semver n m 0)
+                    Three n m o tags -> Geq (SemVer n m o tags)
+  sv2 = case wc2 of Any -> anyVersion
+                    One n -> Lt (semver (n+1) 0 0)
+                    Two n m -> Lt (semver n (m+1) 0)
+                    Three n m o tags -> Leq (SemVer n m o tags)

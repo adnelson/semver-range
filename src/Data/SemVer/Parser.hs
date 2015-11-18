@@ -140,7 +140,7 @@ pSemVerRange = try pHyphen <|> pJoinedSemVerRange
 -- three numbers in the versionBranch field.
 fromHaskellVersion :: Version -> Either Text SemVer
 fromHaskellVersion v = case versionBranch v of
-  [x, y, z] -> return (x, y, z, []) -- ignoring version tags since deprecated
+  [x, y, z] -> return (semver x y z) -- ignoring version tags since deprecated
   bad -> do
     let badVer = intercalate "." (map show bad)
     Left $ pack ("Not a SemVer version: " <> badVer)
