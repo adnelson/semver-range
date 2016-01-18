@@ -12,7 +12,7 @@ import Text.Parsec hiding ((<|>), spaces, parse, State, uncons, optional)
 import qualified Text.Parsec as Parsec
 
 import Data.Version (Version(..))
-import Data.SemVer
+import Data.SemVer.Types
 
 type Parser = ParsecT String () Identity
 

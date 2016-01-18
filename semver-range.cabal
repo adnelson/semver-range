@@ -1,5 +1,5 @@
 name:                semver-range
-version:             0.1.1
+version:             0.2.0
 synopsis:            An implementation of semver and semantic version ranges.
 license:             MIT
 license-file:        LICENSE
@@ -14,9 +14,9 @@ source-repository head
   location: git://github.com/adnelson/semver-range.git
 
 library
-  Exposed-modules:
-    Data.SemVer
-    Data.SemVer.Parser
+  Exposed-modules:     Data.SemVer
+  other-modules:       Data.SemVer.Parser
+                     , Data.SemVer.Types
   other-extensions:    FlexibleContexts
                      , FlexibleInstances
                      , LambdaCase
