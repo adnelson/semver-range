@@ -28,7 +28,7 @@ library
                      , ScopedTypeVariables
                      , TypeFamilies
                      , TypeSynonymInstances
-  build-depends:       base >=4.8 && <4.9
+  build-depends:       base >=4.8 && <5
                      , classy-prelude
                      , text
                      , unordered-containers
