@@ -34,6 +34,14 @@ instance Arbitrary SemVer where
   arbitrary = semver' <$> arb <*> arb <*> arb <*> arbitrary where
     arb = abs <$> arbitrary
 
+instance Arbitrary SemVerRange where
+  arbitrary = oneof [Eq <$> arbitrary,
+                     Lt <$> arbitrary,
+                     Gt <$> arbitrary,
+                     Leq <$> arbitrary,
+                     Geq <$> arbitrary
+                     ]
+
 -- | Unsafe instance!
 instance IsString SemVer where
   fromString s = case parseSemVer (T.pack s) of
@@ -50,7 +58,7 @@ instance Arbitrary Text where
   arbitrary = pack <$> arbitrary
 
 instance Arbitrary PrereleaseTag where
-  arbitrary = oneof [IntTag <$> arbitrary]
+  arbitrary = oneof [IntTag . abs <$> arbitrary]
 
 instance Arbitrary PrereleaseTags where
   arbitrary = PrereleaseTags <$> arbitrary
@@ -87,7 +95,7 @@ main = hspec $ do
       parseSemVer (tshow sv) `shouldBeR` sv
 
     it "should parse a semver with metadata" $ do
-      True `shouldBe` True
+      parseSemVer "1.2.3-pre+asdf" `shouldBeR` semver'' 1 2 3 ["pre"] ["asdf"]
 
     describe "with release tags" $ do
       it "should parse a semver with release tags" $ do
@@ -110,6 +118,11 @@ main = hspec $ do
       -- semver range, we get the range "= V" back.
       parseSemVerRange (tshow sv) `shouldBeR` Eq sv
 
+    it "pretty printing should be an injection" $ property $ \svr -> do
+      -- This says that if we pretty-print a semver V and parse it as a
+      -- semver range, we get the range "= V" back.
+      parseSemVerRange (tshow svr) `shouldBeR` svr
+
     it "should parse a semver with partial version into a range" $ property $
       \(abs -> maj :: Int, abs -> min :: Int) -> do
         let expected = Geq (semver maj min 0) `And` Lt (semver maj (min + 1) 0)
@@ -122,8 +135,8 @@ main = hspec $ do
 
     it "should parse a multi range" $ do
       parseSemVerRange "1.2.3-pre+asdf - 2.4.3-pre+asdf"
-        `shouldBeR` Geq (semver' 1 2 3 ["pre+asdf"])
-                     `And` Lt (semver' 2 4 3 ["pre+asdf"])
+        `shouldBeR` Geq (semver'' 1 2 3 ["pre"] ["asdf"])
+                     `And` Lt (semver'' 2 4 3 ["pre"] ["asdf"])
 
   it "poo" $ do
     let svNoTags = semver 1 2 3
@@ -244,5 +257,5 @@ rangeTests = describe "range tests" $ do
         (_, Left err) -> fail $ "Semver parse failed: " <> show err
         (Right range, Right version) -> case matches range version of
           True -> True `shouldBe` True -- return ()
-          False -> fail $ "Version " <> show version <> "didn't match range "
+          False -> fail $ "Version " <> show version <> " didn't match range "
                        <> show range --`shouldBe` True
