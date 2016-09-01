@@ -3,10 +3,10 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}
 
-module Data.SemVer.Parser where -- (
-  --   parseSemVer, parseSemVerRange, pSemVerRange, pSemVer, p
-  --   fromHaskellVersion, matchText
-  -- ) where
+module Data.SemVer.Parser (
+    parseSemVer, parseSemVerRange, pSemVerRange, pSemVer,
+    fromHaskellVersion, matchText
+  ) where
 
 import qualified Prelude as P
 import ClassyPrelude hiding (try, many)
@@ -26,16 +26,16 @@ type Parser = ParsecT String () Identity
 -- | A partially specified semantic version. Implicitly defines
 -- a range of acceptable versions, as seen in @wildcardToRange@.
 data Wildcard = Any
-              | One Int
-              | Two Int Int
+              | Maj Int
+              | Min Int Int
               | Full SemVer
               deriving (Show, Eq)
 
 -- | Fills in zeros in a wildcard.
 wildcardToSemver :: Wildcard -> SemVer
 wildcardToSemver Any = semver 0 0 0
-wildcardToSemver (One n) = semver n 0 0
-wildcardToSemver (Two n m) = semver n m 0
+wildcardToSemver (Maj n) = semver n 0 0
+wildcardToSemver (Min n m) = semver n m 0
 wildcardToSemver (Full sv) = sv
 
 -- | Translates a wildcard (partially specified version) to a range.
@@ -44,8 +44,8 @@ wildcardToSemver (Full sv) = sv
 wildcardToRange :: Wildcard -> SemVerRange
 wildcardToRange = \case
   Any -> Geq $ semver 0 0 0
-  One n -> Geq (semver n 0 0) `And` Lt (semver (n+1) 0 0)
-  Two n m -> Geq (semver n m 0) `And` Lt (semver n (m+1) 0)
+  Maj n -> Geq (semver n 0 0) `And` Lt (semver (n+1) 0 0)
+  Min n m -> Geq (semver n m 0) `And` Lt (semver n (m+1) 0)
   Full sv -> Eq sv
 
 -- | Translates a ~wildcard to a range.
@@ -55,9 +55,9 @@ tildeToRange = \case
   -- I'm not sure this is officially supported, but just in case...
   Any -> tildeToRange (Full $ semver 0 0 0)
   -- ~1 := >=1.0.0 <(1+1).0.0 := >=1.0.0 <2.0.0 (Same as 1.x)
-  One n -> Geq (semver n 0 0) `And` Lt (semver (n+1) 0 0)
+  Maj n -> Geq (semver n 0 0) `And` Lt (semver (n+1) 0 0)
   -- ~1.2 := >=1.2.0 <1.(2+1).0 := >=1.2.0 <1.3.0 (Same as 1.2.x)
-  Two n m -> Geq (semver n m 0) `And` Lt (semver n (m+1) 0)
+  Min n m -> Geq (semver n m 0) `And` Lt (semver n (m+1) 0)
   -- ~1.2.3 := >=1.2.3 <1.(2+1).0 := >=1.2.3 <1.3.0
   Full (SemVer n m o [] _) -> Geq (semver n m o) `And` Lt (semver n (m+1) 0)
   -- ~1.2.3-beta.2 := >=1.2.3-beta.2 <1.3.0
@@ -67,8 +67,8 @@ tildeToRange = \case
 -- Ex: ^1.2.x := >=1.2.0 <2.0.0
 caratToRange :: Wildcard -> SemVerRange
 caratToRange = \case
-  One n -> Geq (semver n 0 0) `And` Lt (semver (n+1) 0 0)
-  Two n m -> Geq (semver n m 0) `And` Lt (semver (n+1) 0 0)
+  Maj n -> Geq (semver n 0 0) `And` Lt (semver (n+1) 0 0)
+  Min n m -> Geq (semver n m 0) `And` Lt (semver (n+1) 0 0)
   Full (SemVer 0 n m tags _) -> Geq (semver' 0 n m tags) `And` Lt (semver' 0 (n+1) 0 tags)
   Full (SemVer n m o tags _) -> Geq (semver' n m o tags) `And` Lt (semver' (n+1) 0 0 tags)
 
@@ -79,12 +79,12 @@ caratToRange = \case
 hyphenatedRange :: Wildcard -> Wildcard -> SemVerRange
 hyphenatedRange wc1 wc2 = And sv1 sv2 where
   sv1 = case wc1 of Any -> anyVersion
-                    One n -> Geq (semver n 0 0)
-                    Two n m -> Geq (semver n m 0)
+                    Maj n -> Geq (semver n 0 0)
+                    Min n m -> Geq (semver n m 0)
                     Full sv -> Geq sv
   sv2 = case wc2 of Any -> anyVersion
-                    One n -> Lt (semver (n+1) 0 0)
-                    Two n m -> Lt (semver n (m+1) 0)
+                    Maj n -> Lt (semver (n+1) 0 0)
+                    Min n m -> Lt (semver n (m+1) 0)
                     Full sv -> Lt sv
 
 -- | Given a parser and a string, attempts to parse the string.
@@ -132,11 +132,13 @@ parseSemVerRange text = case T.strip text of
 
 -- | Parse a string as an explicit version, or return an error.
 parseSemVer :: Text -> Either ParseError SemVer
-parseSemVer = parse pSemVer
+parseSemVer = parse pSemVer . T.strip
 
 -- | Parses a semantic version.
 pSemVer :: Parser SemVer
-pSemVer = wildcardToSemver <$> pWildCard
+pSemVer = do
+  optional (char '=')
+  wildcardToSemver <$> pWildCard
 
 pVersionComp :: Parser SemVerRange
 pVersionComp = cmp >>= \case
@@ -154,8 +156,8 @@ pVersionComp = cmp >>= \case
   where
     topOf = \case
       Any -> semver 0 0 0
-      One n -> semver (n+1) 0 0
-      Two n m -> semver n (m+1) 0
+      Maj n -> semver (n+1) 0 0
+      Min n m -> semver n (m+1) 0
       Full sv -> sv
 
 -- | Parses a comparison operator.
@@ -197,8 +199,8 @@ pWildCard = try $ do
   optional (char 'v')
   res <- takeWhile isJust <$> sepBy1 bound (sstring ".") >>= \case
     [] -> return Any
-    [Just n] -> return $ One n
-    [Just n, Just m] -> return $ Two n m
+    [Just n] -> return $ Maj n
+    [Just n, Just m] -> return $ Min n m
     [Just n, Just m, Just o] -> option (Full $ semver n m o) $ do
       -- Release tags might be separated by a hyphen, or not.
       optional (char '-')

@@ -12,7 +12,7 @@
 module Main (main) where
 
 import ClassyPrelude
-import Data.Either
+import Data.Either (isRight, isLeft)
 import Test.Hspec
 import Test.QuickCheck (property, Arbitrary(..), oneof)
 import qualified Data.Text as T
@@ -138,19 +138,41 @@ main = hspec $ do
         `shouldBeR` Geq (semver'' 1 2 3 ["pre"] ["asdf"])
                      `And` Lt (semver'' 2 4 3 ["pre"] ["asdf"])
 
-  it "poo" $ do
-    let svNoTags = semver 1 2 3
-        svTags = semver' 1 2 3 ["pre"]
-        svTags' = semver' 2 4 3 ["pre"]
-    svNoTags >= svTags `shouldBe` True
-    let range = Geq svTags `And` Lt svTags'
-    range `matches` svNoTags `shouldBe` True
   rangeTests
-
+  cleanTests
 
 -- | These test cases were adapted from
--- https://github.com/npm/node-semver/blob/
---   d21444a0658224b152ce54965d02dbe0856afb84/test/index.js#L134
+-- https://github.com/npm/node-semver/blob/master/test/clean.js
+cleanTests :: Spec
+cleanTests = describe "unclean version strings" $ do
+  let examples :: [(Text, Maybe Text)] = [
+        ("1.2.3", Just "1.2.3"),
+        (" 1.2.3 ", Just "1.2.3"),
+        (" 1.2.3-4 ", Just "1.2.3-4"),
+        (" 1.2.3-pre ", Just "1.2.3-pre"),
+        ("  =v1.2.3   ", Just "1.2.3"),
+        ("v1.2.3", Just "1.2.3"),
+        (" v1.2.3 ", Just "1.2.3"),
+        ("\t1.2.3", Just "1.2.3"),
+        (">1.2.3", Nothing),
+        ("~1.2.3", Nothing),
+        ("<=1.2.3", Nothing)
+        -- The example below is given in the tests but this doesn't
+        -- seem like an error to me, so there.
+        -- ("1.2.x", Nothing)
+        ]
+  forM_ examples $ \(string, result) -> case result of
+    Just string' -> do
+      it ("should parse " <> show string <> " same as " <> show string') $ do
+        parseSemVer string `shouldSatisfy` isRight
+        parseSemVer string `shouldBe` parseSemVer string'
+
+    Nothing -> do
+      it ("should not parse " <> show string) $ do
+        parseSemVer string `shouldSatisfy` isLeft
+
+-- | These test cases were adapted from
+-- https://github.com/npm/node-semver/blob/master/test/index.js#L134
 rangeTests :: Spec
 rangeTests = describe "range tests" $ do
   -- In each case, the range described in the first element of the
