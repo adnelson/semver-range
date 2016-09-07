@@ -73,6 +73,9 @@ shouldBeR x y = do
 
 infixl 1 `shouldBeR`
 
+shouldBeL :: (Show a, Show b, Eq a) => Either a b -> IO ()
+shouldBeL x = shouldSatisfy x isLeft
+
 main :: IO ()
 main = hspec $ do
   describe "semver parsing" $ do
@@ -137,6 +140,9 @@ main = hspec $ do
       parseSemVerRange "1.2.3-pre+asdf - 2.4.3-pre+asdf"
         `shouldBeR` Geq (semver'' 1 2 3 ["pre"] ["asdf"])
                      `And` Lt (semver'' 2 4 3 ["pre"] ["asdf"])
+
+    it "should fail when it's wrong" $ do
+      shouldBeL (parseSemVerRange "xyz")
 
   rangeTests
   cleanTests

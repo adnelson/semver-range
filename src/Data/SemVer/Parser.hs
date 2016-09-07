@@ -5,7 +5,7 @@
 
 module Data.SemVer.Parser (
     parseSemVer, parseSemVerRange, pSemVerRange, pSemVer,
-    fromHaskellVersion, matchText
+    fromHaskellVersion, matchText, splitWS
   ) where
 
 import qualified Prelude as P
@@ -19,6 +19,10 @@ import Data.Version (Version(..))
 import Data.SemVer.Types
 
 type Parser = ParsecT String () Identity
+
+-- | Split a text on whitespace. Why isn't this in the stdlib.
+splitWS :: Text -> [Text]
+splitWS = filter (/= "") . T.split (flip elem (" \t\n\r" :: String))
 
 -------------------------------------------------------------------------------
 -- Wildcards: intermediate representations of semvers
@@ -96,11 +100,11 @@ parseFull p = Parsec.parse (p <* eof) "" . unpack
 
 -- | Consumes any spaces (not other whitespace).
 spaces :: Parser String
-spaces = many $ oneOf [' ', '\t']
+spaces = many $ oneOf [' ', '\t', '\n', '\r']
 
 -- | Consumes at least one space (not other whitespace).
 spaces1 :: Parser String
-spaces1 = many1 $ oneOf [' ', '\t']
+spaces1 = many1 $ oneOf [' ', '\t', '\n', '\r']
 
 -- | Parses the given string and any trailing spaces.
 sstring :: String -> Parser String
@@ -128,7 +132,7 @@ parseSemVerRange text = case T.strip text of
   -- Handle a few special cases
   "" -> return anyVersion
   "||" -> return anyVersion
-  t -> parse pSemVerRange t
+  t -> parse (pSemVerRange <* eof) t
 
 -- | Parse a string as an explicit version, or return an error.
 parseSemVer :: Text -> Either ParseError SemVer
@@ -178,7 +182,7 @@ pJoinedSemVerRange :: Parser SemVerRange
 pJoinedSemVerRange = do
   first <- pSemVerRangeSingle
   option first $ do
-    lookAhead (sstring "||" <|> cmp) >>= \case
+    lookAhead (sstring "||" <|> map singleton anyChar) >>= \case
       "||" -> Or first <$> (sstring "||" *> pJoinedSemVerRange)
       _ -> And first <$> pJoinedSemVerRange
 
@@ -202,14 +206,15 @@ pWildCard = try $ do
     [Just n] -> return $ Maj n
     [Just n, Just m] -> return $ Min n m
     [Just n, Just m, Just o] -> option (Full $ semver n m o) $ do
-      -- Release tags might be separated by a hyphen, or not.
-      optional (char '-')
-      tags <- PrereleaseTags <$> (tag `sepBy1` char '.')
+      tags <- option [] $ do
+        -- Release tags might be separated by a hyphen, or not.
+        optional (char '-')
+        PrereleaseTags <$> (tag `sepBy1` char '.')
       -- Grab metadata if there is any
-      option (Full $ semver'' n m o tags []) $ do
+      metadata <- option [] $ do
         char '+'
-        metadata <- many1 (letter <|> digit <|> char '-') `sepBy1` char '.'
-        return $ Full $ semver'' n m o tags (map pack metadata)
+        many1 (letter <|> digit <|> char '-') `sepBy1` char '.'
+      return $ Full $ semver'' n m o tags (map pack metadata)
     w -> unexpected ("Invalid version " ++ show w)
   spaces *> return res
 
