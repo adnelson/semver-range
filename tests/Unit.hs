@@ -141,6 +141,10 @@ main = hspec $ do
         `shouldBeR` Geq (semver'' 1 2 3 ["pre"] ["asdf"])
                      `And` Lt (semver'' 2 4 3 ["pre"] ["asdf"])
 
+    it "should parse semvers with && instead of spaces" $ do
+      let expected = Geq (semver 2 0 0) `And` Leq (semver 2 15 0)
+      parseSemVerRange ">= 2 && <= 2.14" `shouldBeR` expected
+
     it "should fail when it's wrong" $ do
       shouldBeL (parseSemVerRange "xyz")
 

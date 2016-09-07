@@ -182,8 +182,10 @@ pJoinedSemVerRange :: Parser SemVerRange
 pJoinedSemVerRange = do
   first <- pSemVerRangeSingle
   option first $ do
-    lookAhead (sstring "||" <|> map singleton anyChar) >>= \case
+    let next = choice [sstring "||", sstring "&&", map singleton anyChar]
+    lookAhead next >>= \case
       "||" -> Or first <$> (sstring "||" *> pJoinedSemVerRange)
+      "&&" -> And first <$> (sstring "&&" *> pJoinedSemVerRange)
       _ -> And first <$> pJoinedSemVerRange
 
 -- | Parses a hyphenated range.
