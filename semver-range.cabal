@@ -1,5 +1,5 @@
 name:                semver-range
-version:             0.2.5
+version:             0.2.6
 synopsis:            An implementation of semver and semantic version ranges.
 license:             MIT
 license-file:        LICENSE
