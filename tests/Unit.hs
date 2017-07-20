@@ -19,16 +19,6 @@ import qualified Data.Text as T
 
 import Data.SemVer
 
--- | This instance seems to be missing :(
-instance (Arbitrary a, Arbitrary b, Arbitrary c,
-          Arbitrary d, Arbitrary e, Arbitrary f)
-         => Arbitrary (a, b, c, d, e, f) where
-  arbitrary = (,,,,,) <$> arbitrary
-                      <*> arbitrary
-                      <*> arbitrary
-                      <*> arbitrary
-                      <*> arbitrary
-                      <*> arbitrary
 -- | Arbitrary semver
 instance Arbitrary SemVer where
   arbitrary = semver' <$> arb <*> arb <*> arb <*> arbitrary where
