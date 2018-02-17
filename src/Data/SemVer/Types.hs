@@ -150,6 +150,7 @@ versionsOf = \case
   And svr1 svr2 -> versionsOf svr1 <> versionsOf svr2
   Or svr1 svr2 -> versionsOf svr1 <> versionsOf svr2
 
+-- | Strip out all prerelease tags from a given 'SemVerRange'.
 stripRangeTags :: SemVerRange -> SemVerRange
 stripRangeTags = \case
   Eq  sv -> Eq  (sv { svTags = [] })
@@ -228,18 +229,34 @@ matches range version =
     -- prerelease tags is whether the semantic version in both is the
     -- same; if it is not, then we must reject the version.
     --
-    -- Note that we could have a conjunction, so we want to see if our
-    -- version tuple is in the list of tuples for the range. However,
-    -- it would be possible to then match with, say, the upper-bound
-    -- version tuple which may be constrained by a less-than
-    -- relation. Therefore, if there is an equivalent range tuple to
-    -- the version tuple, we want to check if it satisfies the
-    -- constraints with the goal of rejecting early.
+    -- Note that we could have a conjunction or a disjunction, so we
+    -- want to see if our version tuple is in the list of tuples for
+    -- the range. However, it would be possible to then match with,
+    -- say, the upper-bound version tuple which may be constrained by
+    -- a less-than relation. Therefore, if there is an equivalent
+    -- range tuple to the version tuple, we want to check if it
+    -- satisfies the constraints with the goal of rejecting early.
+    --
+    -- For example, if we assume a range constraint of "^1.2.3-alpha"
+    -- this translates to ">=1.2.3-alpha <2.0.0-alpha". Also assume we
+    -- have the version "1.2.3-alpha". In the trivial case, we check
+    -- to see if the version's tuple ("1.2.3") is in the set of
+    -- version tuples for the range ([ (1.2.3), (2.0.0) ]). We can
+    -- clearly see that it is, therefore we proceed with a match check
+    -- on the tags.
+    --
+    -- However, what if we try to match "2.0.0-alpha" against the
+    -- range constraint we've already given? If we only check for
+    -- membership of our version tuple ("2.0.0") in the set of range
+    -- tuples ([ (1.2.3), (2.0.0) ]) then we would get a match, this
+    -- is not correct. Thus, if the version tuple is a member of the
+    -- set of range tuples we must also check that it satisfies the
+    -- range constraints sans prerelease tags.
     (Just rTags, vTags)
 
-      -- Explicit rejection, e.g. "^1.2.3-alpha" should reject
+      -- Explicit rejection, e.g. "^1.2.3-alpha" must reject
       -- "1.2.4-alpha" and "2.0.0-alpha", anything else is safe to
-      -- compare based on tags
+      -- compare based on tags so we can let it "fall through".
       | versionTuple `notElem` rangeTuple || not (matchesSimple rangeNoTags versionNoTags)
         -> False
 
