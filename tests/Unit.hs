@@ -180,15 +180,39 @@ rangeTests = describe "range tests" $ do
   -- the second element of the tuple.
   let testCases :: [(Bool, Text, Text)] = [
 
+        -- Range constraints with pre-release tags require that any
+        -- version satisfying the constraint must be equivalent (in
+        -- its semantic version tuple) to the minimum of all semantic
+        -- versions within the range. In this case the minimum of the
+        -- range is "1.2.3" and the version's semantic version tuple
+        -- is "1.2.3", therefore it does not satisfy the constraints
+        -- of the range given the presence of pre-release tags.
         (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.4-pre+asdf"),
         (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "2.4.3-alpha"),
         (False, ">=0.0.1-alpha <0.2.0-alpha", "0.1.1-alpha"),
         (False, "^0.0.1-alpha", "0.0.4-alpha"),
+
+        -- Range constraints without prerelease tags are very strict
+        -- about not admitting versions *with* prerelease tags
         (False, "^0.1.2", "0.1.2-beta1"),
         (False, "^0.1.2", "0.1.4-beta1"),
+
+        -- Despite the numeric quantity, these versions have
+        -- prerelease tags and are therefore subjected to the same
+        -- invariant checking.
         (False, "^1.2.3-1", "1.8.1-1"),
         (False, "^1.2.3-1", "1.8.1-4"),
+
+        -- If we ever have an exact version tuple match at the top of
+        -- a given range then it must satisfy the range constraint!
+        --
+        -- e.g. "^1.2.3-alpha" translates to ">=1.2.3-alpha
+        -- <2.0.0-alpha" and the version to check is "2.0.0-alpha". In
+        -- this case the version tuples are equivalent, sans
+        -- prerelease tags, but it does not satisfy the upper-bound
+        -- less-than relation.
         (False, "^1.2.3-alpha", "2.0.0-alpha"),
+
         (True,  "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.3-pre+asdf"),
         (True, "", "1.0.0"),
         (True, "*", "1.2.3"),
