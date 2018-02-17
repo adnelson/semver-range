@@ -195,22 +195,24 @@ renderSV = pack . show
 -- | Returns whether a given semantic version matches a range.
 -- Note that there are special cases when there are prerelease tags. For
 -- details see https://github.com/npm/node-semver#prerelease-tags.
--- matches :: SemVerRange -> SemVer -> Bool
--- matches range version = case (sharedTags range, svTags version) of
---   -- This is the simple case, where neither the range nor the version has given
---   -- prerelease tags. Then we can just do regular predicate calculus.
---   (Nothing, PrereleaseTags []) -> matchesSimple range version
---   _ -> undefined
---   -- (Just rTags, PrereleaseTags vTags)
---   --   | rTags == vTags -> matchesSimple range version
---   --   | tuplesOf range /= [toTuple version] -> False
---   --   | otherwise -> matchesTags range rTags vTags
---   -- (_, _) -> False
+matches :: SemVerRange -> SemVer -> Bool
+matches range version = case (sharedTags range, svTags version) of
+  -- This is the simple case, where neither the range nor the version has given
+  -- prerelease tags. Then we can just do regular predicate calculus.
+  (Nothing, PrereleaseTags []) -> matchesSimple range version
+  (Just (PrereleaseTags rTags), PrereleaseTags vTags)
+    | rTags == vTags
+      -> matchesSimple range version
+    | tuplesOf range /= [toTuple version]
+      -> False
+    | otherwise
+      -> matchesTags range rTags vTags
+  (_, _) -> False
 
 -- | Simple predicate calculus matching, doing AND and OR combination with
 -- numerical comparison.
-matches :: SemVerRange -> SemVer -> Bool
-matches range ver = case range of
+matchesSimple :: SemVerRange -> SemVer -> Bool
+matchesSimple range ver = case range of
   Eq sv -> ver == sv
   Gt sv -> ver > sv
   Lt sv -> ver < sv
