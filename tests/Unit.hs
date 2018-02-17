@@ -184,6 +184,7 @@ rangeTests = describe "range tests" $ do
         (True, "^0.0.1-alpha.1", "0.0.1-alpha.t"),
         (True, "^0.0.1-alpha.1", "0.0.1-alpha.tdff.dddddddddd"),
         (False, "^1.2.3-alpha", "2.0.0-alpha"),
+        (True,  "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.3-pre+asdf"),
         (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.4-pre+asdf"),
         (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "2.4.3-alpha"),
         (False, ">=0.0.1-alpha <0.2.0-alpha", "0.1.1-alpha"),
