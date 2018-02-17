@@ -150,6 +150,17 @@ versionsOf = \case
   And svr1 svr2 -> versionsOf svr1 <> versionsOf svr2
   Or svr1 svr2 -> versionsOf svr1 <> versionsOf svr2
 
+-- | Strip out all prerelease tags from a given 'SemVerRange'.
+stripRangeTags :: SemVerRange -> SemVerRange
+stripRangeTags = \case
+  Eq  sv -> Eq  (sv { svTags = [] })
+  Geq sv -> Geq (sv { svTags = [] })
+  Leq sv -> Leq (sv { svTags = [] })
+  Lt  sv -> Lt  (sv { svTags = [] })
+  Gt  sv -> Gt  (sv { svTags = [] })
+  And svr1 svr2 -> And (stripRangeTags svr1) (stripRangeTags svr2)
+  Or  svr1 svr2 -> Or  (stripRangeTags svr1) (stripRangeTags svr2)
+
 -- | Create a SemVer with no version tags.
 semver :: Int -> Int -> Int -> SemVer
 semver major minor patch = semver' major minor patch []
@@ -195,22 +206,77 @@ renderSV = pack . show
 -- | Returns whether a given semantic version matches a range.
 -- Note that there are special cases when there are prerelease tags. For
 -- details see https://github.com/npm/node-semver#prerelease-tags.
--- matches :: SemVerRange -> SemVer -> Bool
--- matches range version = case (sharedTags range, svTags version) of
---   -- This is the simple case, where neither the range nor the version has given
---   -- prerelease tags. Then we can just do regular predicate calculus.
---   (Nothing, PrereleaseTags []) -> matchesSimple range version
---   _ -> undefined
---   -- (Just rTags, PrereleaseTags vTags)
---   --   | rTags == vTags -> matchesSimple range version
---   --   | tuplesOf range /= [toTuple version] -> False
---   --   | otherwise -> matchesTags range rTags vTags
---   -- (_, _) -> False
+matches :: SemVerRange -> SemVer -> Bool
+matches range version =
+  case (sharedTags range, svTags version) of
+
+    (Nothing, PrereleaseTags vTags)
+      -- Neither the range nor the version have prerelease tags
+      | null vTags -> matchesSimple range version
+
+      -- If there is no prerelease tag in the range but there is in
+      -- the version reject it
+      | otherwise  -> False
+
+    -- A range with a prerelease tag can match a version without a
+    -- prerelease tag provided it *does* meet the semantic version
+    -- tuple's constraint criteria
+    (Just _, PrereleaseTags []) ->
+      matchesSimple range version
+
+    -- The most important invariant when considering a comparison
+    -- between a range with prerelease tags and a version with
+    -- prerelease tags is whether the semantic version in both is the
+    -- same; if it is not, then we must reject the version.
+    --
+    -- Note that we could have a conjunction or a disjunction, so we
+    -- want to see if our version tuple is in the list of tuples for
+    -- the range. However, it would be possible to then match with,
+    -- say, the upper-bound version tuple which may be constrained by
+    -- a less-than relation. Therefore, if there is an equivalent
+    -- range tuple to the version tuple, we want to check if it
+    -- satisfies the constraints with the goal of rejecting early.
+    --
+    -- For example, if we assume a range constraint of "^1.2.3-alpha"
+    -- this translates to ">=1.2.3-alpha <2.0.0-alpha". Also assume we
+    -- have the version "1.2.3-alpha". In the trivial case, we check
+    -- to see if the version's tuple ("1.2.3") is in the set of
+    -- version tuples for the range ([ (1.2.3), (2.0.0) ]). We can
+    -- clearly see that it is, therefore we proceed with a match check
+    -- on the tags.
+    --
+    -- However, consider matching "2.0.0-alpha" against the range
+    -- constraint we've already given. If we only check for membership
+    -- of our version tuple ("2.0.0") in the set of range tuples ([
+    -- (1.2.3), (2.0.0) ]) then we would get a match, this is not
+    -- correct. Thus, if the version tuple is a member of the set of
+    -- range tuples we must also check that it satisfies the range
+    -- constraints sans prerelease tags.
+    (Just rTags, vTags)
+
+      -- Explicit rejection, e.g. "^1.2.3-alpha" must reject
+      -- "1.2.4-alpha" and "2.0.0-alpha", anything else is safe to
+      -- compare based on tags so we can let it "fall through".
+      | versionTuple `notElem` rangeTuple || not (matchesSimple rangeNoTags versionNoTags)
+        -> False
+
+      | rTags == vTags
+        -> True
+
+      | rTags /= vTags
+        -> matchesTags range rTags vTags
+
+  where
+    rangeTuple   = tuplesOf range
+    versionTuple = toTuple version
+
+    rangeNoTags   = stripRangeTags range
+    versionNoTags = version { svTags = [] }
 
 -- | Simple predicate calculus matching, doing AND and OR combination with
 -- numerical comparison.
-matches :: SemVerRange -> SemVer -> Bool
-matches range ver = case range of
+matchesSimple :: SemVerRange -> SemVer -> Bool
+matchesSimple range ver = case range of
   Eq sv -> ver == sv
   Gt sv -> ver > sv
   Lt sv -> ver < sv
@@ -223,18 +289,19 @@ infixl 2 `matches`
 
 -- | Given a range and two sets of tags, the first being a bound on the second,
 -- uses the range to compare the tags and see if they match.
-matchesTags :: SemVerRange -> [PrereleaseTag] -> [PrereleaseTag] -> Bool
-matchesTags range rangeTags verTags = case range of
-  Eq _ -> verTags == rangeTags
-  Gt _ -> verTags > rangeTags
-  Lt _ -> verTags < rangeTags
-  Geq _ -> verTags >= rangeTags
-  Leq _ -> verTags <= rangeTags
-  -- Note that as we're currently doing things, these cases won't get hit.
-  And svr1 svr2 -> matchesTags svr1 verTags rangeTags &&
-                     matchesTags svr2 verTags rangeTags
-  Or svr1 svr2 -> matchesTags svr1 verTags rangeTags ||
-                     matchesTags svr2 verTags rangeTags
+matchesTags :: SemVerRange -> PrereleaseTags -> PrereleaseTags -> Bool
+matchesTags range rangeTags verTags =
+  case range of
+    Eq _  -> verTags == rangeTags
+    Gt _  -> verTags >  rangeTags
+    Lt _  -> verTags <  rangeTags
+    Geq _ -> verTags >= rangeTags
+    Leq _ -> verTags <= rangeTags
+
+    And svr1 svr2 ->
+      matchesTags svr1 rangeTags verTags
+    Or svr1 svr2 ->
+      matchesTags svr1 rangeTags verTags || matchesTags svr2 rangeTags verTags
 
 -- | Gets the highest-matching semver in a range.
 bestMatch :: SemVerRange -> [SemVer] -> Either String SemVer
