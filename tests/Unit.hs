@@ -179,19 +179,22 @@ rangeTests = describe "range tests" $ do
   -- tuple should be satisfied by the concrete version described in
   -- the second element of the tuple.
   let testCases :: [(Bool, Text, Text)] = [
-        (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.3"),
-        (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.3-pre.2"),   -- Should this match?
+
+        (True, "^1.2.3-alpha.1", "1.2.3-alpha.7"),
+        (True, "^0.0.1-alpha.1", "0.0.1-alpha.t"),
+        (True, "^0.0.1-alpha.1", "0.0.1-alpha.tdff.dddddddddd"),
+        (False, "^1.2.3-alpha", "2.0.0-alpha"),
+        (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.4-pre+asdf"),
         (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "2.4.3-alpha"),
-        (False, "1.2.3-pre+asdf - 2.4.3pre+asdf", "1.2.3"),
-        (False, "1.2.3pre+asdf - 2.4.3pre+asdf", "1.2.3"),
-        (False, "^0.0.1-alpha", "0.0.1-beta"),
+        (False, ">=0.0.1-alpha <0.2.0-alpha", "0.1.1-alpha"),
+        (True, "^0.0.1-alpha", "0.0.1-beta"),
+        (False, "^0.0.1-alpha", "0.0.4-alpha"),
         (False, "^0.1.2", "0.1.2-beta1"),
         (False, "^0.1.2", "0.1.4-beta1"),
-        (False, "^1.2.0-alpha", "1.2.0-pre"),
-        (False, "^1.2.3-alpha", "1.2.3-pre"),
-        (False, "^1.2.3-alpha.1", "1.2.3-alpha.7"), -- This should match, it's an example straight from their documentation
-        (False, "~v0.5.4-pre", "0.5.4"), -- Should this match?
-        (False, "~v0.5.4-pre", "0.5.5"), -- Should this match?
+        (True, "^1.2.0-alpha", "1.2.0-pre"),
+        (False, "^1.2.3-1", "1.8.1-1"),
+        (False, "^1.2.3-1", "1.8.1-4"),
+        (True, "^1.2.3-alpha", "1.2.3-pre"),
         (True, "", "1.0.0"),
         (True, "*", "1.2.3"),
         (True, "*", "1.2.3"),
@@ -202,9 +205,14 @@ rangeTests = describe "range tests" $ do
         (True, "1.2.* || 2.*", "1.2.3"),
         (True, "1.2.* || 2.*", "2.1.3"),
         (True, "1.2.*", "1.2.3"),
+        (True, "1.2.3 - 2.4.3", "1.2.4"),
         (True, "1.2.3 >=1.2.1", "1.2.3"),
         (True, "1.2.3+asdf - 2.4.3+asdf", "1.2.3"),
-        (True, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.4-pre+asdf"),
+        (True, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.3"),
+        (True, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.3-pre.2"),
+        (True, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.3-pred"),
+        (True, "1.2.3-pre+asdf - 2.4.3pre+asdf", "1.2.3"),
+        (True, "1.2.3pre+asdf - 2.4.3pre+asdf", "1.2.3"),
         (True, "1.2.x || 2.x", "1.2.3"),
         (True, "1.2.x || 2.x", "2.1.3"),
         (True, "1.2.x", "1.2.3"),
@@ -235,6 +243,7 @@ rangeTests = describe "range tests" $ do
         (True, ">=  1.0.0", "1.0.1"),
         (True, ">= 1", "1.0.0"),
         (True, ">= 1.0.0", "1.0.0"),
+        (True, ">= 4.0.0 <4.1.0-0", "4.0.1"),
         (True, ">=*", "0.2.4"),
         (True, ">=0.1.97", "0.1.97"),
         (True, ">=0.1.97", "v0.1.97"),
@@ -257,6 +266,7 @@ rangeTests = describe "range tests" $ do
         (True, "^1.2.3", "1.8.1"),
         (True, "^1.2.3+build", "1.2.3"),
         (True, "^1.2.3+build", "1.3.0"),
+        (True, "^1.2.3-boop", "1.2.4"),
         (True, "x", "1.2.3"),
         (True, "||", "1.3.4"),
         (True, "~ 1.0", "1.0.2"),
@@ -273,8 +283,9 @@ rangeTests = describe "range tests" $ do
         (True, "~2.4", "2.4.5"),
         (True, "~> 1", "1.2.3"),
         (True, "~>1", "1.2.3"),
-        (True, "~>3.2.1", "3.2.2"),
-        (True, "^0.0.1-alpha", "0.0.4-alpha")
+        (True, "~v0.5.4-pre", "0.5.4"),
+        (True, "~v0.5.4-pre", "0.5.5"),
+        (True, "~>3.2.1", "3.2.2")
         ]
   forM_ testCases $ \(expectedMatchBool, range, version) -> do
     let fail_ = expectationFailure
