@@ -245,13 +245,13 @@ matches range version =
     -- clearly see that it is, therefore we proceed with a match check
     -- on the tags.
     --
-    -- However, what if we try to match "2.0.0-alpha" against the
-    -- range constraint we've already given? If we only check for
-    -- membership of our version tuple ("2.0.0") in the set of range
-    -- tuples ([ (1.2.3), (2.0.0) ]) then we would get a match, this
-    -- is not correct. Thus, if the version tuple is a member of the
-    -- set of range tuples we must also check that it satisfies the
-    -- range constraints sans prerelease tags.
+    -- However, consider matching "2.0.0-alpha" against the range
+    -- constraint we've already given. If we only check for membership
+    -- of our version tuple ("2.0.0") in the set of range tuples ([
+    -- (1.2.3), (2.0.0) ]) then we would get a match, this is not
+    -- correct. Thus, if the version tuple is a member of the set of
+    -- range tuples we must also check that it satisfies the range
+    -- constraints sans prerelease tags.
     (Just rTags, vTags)
 
       -- Explicit rejection, e.g. "^1.2.3-alpha" must reject
