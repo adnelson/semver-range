@@ -185,7 +185,7 @@ rangeTests = describe "range tests" $ do
         -- its semantic version tuple) to the minimum of all semantic
         -- versions within the range. In this case the minimum of the
         -- range is "1.2.3" and the version's semantic version tuple
-        -- is "1.2.3", therefore it does not satisfy the constraints
+        -- is "1.2.4", therefore it does not satisfy the constraints
         -- of the range given the presence of pre-release tags.
         (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "1.2.4-pre+asdf"),
         (False, "1.2.3-pre+asdf - 2.4.3-pre+asdf", "2.4.3-alpha"),
