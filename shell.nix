@@ -1,2 +1,1 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "ghc7102" }:
-(import ./default.nix { inherit nixpkgs compiler; }).env
+args@{...}: (import ./release.nix args).semver-range.env
