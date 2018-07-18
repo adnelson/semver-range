@@ -1,18 +1,18 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE OverloadedLists            #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module Data.SemVer.Types where
 
-import ClassyPrelude
-import qualified Prelude as P
-import Data.Text (Text)
-import qualified Data.Text as T
-import GHC.Exts (IsList(..), Item)
+import           ClassyPrelude
+import           Data.Text     (Text)
+import qualified Data.Text     as T
+import           GHC.Exts      (IsList (..), Item)
+import qualified Prelude       as P
 
 -------------------------------------------------------------------------------
 -- Prerelease tags
@@ -24,7 +24,7 @@ data PrereleaseTag
   deriving (Eq, Ord, Generic)
 
 instance Show PrereleaseTag where
-  show (IntTag i) = show i
+  show (IntTag i)  = show i
   show (TextTag t) = T.unpack t
 
 instance IsString PrereleaseTag where
@@ -33,7 +33,7 @@ instance IsString PrereleaseTag where
 instance Hashable PrereleaseTag
 
 newtype PrereleaseTags = PrereleaseTags [PrereleaseTag]
-  deriving (Show, Eq, Monoid, Generic)
+  deriving (Show, Eq, Semigroup, Monoid, Generic)
 
 instance IsList PrereleaseTags where
   type Item PrereleaseTags = PrereleaseTag
@@ -61,16 +61,16 @@ instance Ord PrereleaseTags where
     ([], _:_) -> GT
     (_:_, []) -> GT
     _ -> go $ zipMaybe prt1 prt2 where
-      zipMaybe (x:xs) (y:ys)  =  (Just x, Just y) : zipMaybe xs ys
-      zipMaybe xs     []      =  [(Just x, Nothing) | x <- xs]
-      zipMaybe []     ys      =  [(Nothing, Just y) | y <- ys]
+      zipMaybe (x:xs) (y:ys) =  (Just x, Just y) : zipMaybe xs ys
+      zipMaybe xs     []     =  [(Just x, Nothing) | x <- xs]
+      zipMaybe []     ys     =  [(Nothing, Just y) | y <- ys]
 
       go [] = EQ -- They were the same
       go ((Nothing, Nothing):_) = EQ -- Same as above (shouldn't happen but)
       go ((Just _, Nothing):_) = GT -- First list was longer than the second.
       go ((Nothing, Just _):_) = LT -- Second list was longer than the first.
       go ((Just tag1, Just tag2):rest) = case compare tag1 tag2 of
-        EQ -> go rest
+        EQ     -> go rest
         result -> result
 
 -------------------------------------------------------------------------------
@@ -86,10 +86,10 @@ type BuildMetaData = [Text]
 -- | A SemVer has major, minor and patch versions, and zero or more
 -- pre-release version tags.
 data SemVer = SemVer {
-  svMajor :: !Int,
-  svMinor :: !Int,
-  svPatch :: !Int,
-  svTags :: !PrereleaseTags,
+  svMajor         :: !Int,
+  svMinor         :: !Int,
+  svPatch         :: !Int,
+  svTags          :: !PrereleaseTags,
   svBuildMetadata :: !BuildMetaData
   } deriving (Eq, Generic)
 
@@ -102,10 +102,10 @@ instance Show SemVer where
   show (SemVer x y z tags mdata) = base <> tags' <> mdata' where
     base = show x <> "." <> show y <> "." <> show z
     tags' = case tags of
-      PrereleaseTags [] -> mempty
+      PrereleaseTags []   -> mempty
       PrereleaseTags tags -> "-" <> intercalate "." (map show tags)
     mdata' = case mdata of
-      [] -> mempty
+      []    -> mempty
       stuff -> "+" <> intercalate "." (map T.unpack stuff)
 
 instance Hashable SemVer
@@ -277,13 +277,13 @@ matches range version =
 -- numerical comparison.
 matchesSimple :: SemVerRange -> SemVer -> Bool
 matchesSimple range ver = case range of
-  Eq sv -> ver == sv
-  Gt sv -> ver > sv
-  Lt sv -> ver < sv
-  Geq sv -> ver >= sv
-  Leq sv -> ver <= sv
+  Eq sv             -> ver == sv
+  Gt sv             -> ver > sv
+  Lt sv             -> ver < sv
+  Geq sv            -> ver >= sv
+  Leq sv            -> ver <= sv
   And range1 range2 -> matches range1 ver && matches range2 ver
-  Or range1 range2 -> matches range1 ver || matches range2 ver
+  Or range1 range2  -> matches range1 ver || matches range2 ver
 
 infixl 2 `matches`
 
