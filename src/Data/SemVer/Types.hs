@@ -33,7 +33,7 @@ instance IsString PrereleaseTag where
 instance Hashable PrereleaseTag
 
 newtype PrereleaseTags = PrereleaseTags [PrereleaseTag]
-  deriving (Show, Eq, Monoid, Generic)
+  deriving (Show, Eq, Semigroup, Monoid, Generic)
 
 instance IsList PrereleaseTags where
   type Item PrereleaseTags = PrereleaseTag
