@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "semver-range";
-  version = "0.2.6";
+  version = "0.2.7";
   src = ./.;
   libraryHaskellDepends = [
     base classy-prelude parsec text unordered-containers
