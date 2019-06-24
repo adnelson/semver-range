@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE CPP #-}
 
 module Data.SemVer.Types where
 
@@ -33,7 +34,11 @@ instance IsString PrereleaseTag where
 instance Hashable PrereleaseTag
 
 newtype PrereleaseTags = PrereleaseTags [PrereleaseTag]
+#if MIN_VERSION_base(4,11,0)
+  deriving (Show, Eq, Semigroup, Monoid, Generic)
+#else
   deriving (Show, Eq, Monoid, Generic)
+#endif
 
 instance IsList PrereleaseTags where
   type Item PrereleaseTags = PrereleaseTag

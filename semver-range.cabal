@@ -40,6 +40,9 @@ test-suite unit-tests
   type:                exitcode-stdio-1.0
   hs-source-dirs:      src, tests
   main-is:             Unit.hs
+  other-modules:       Data.SemVer
+                     , Data.SemVer.Parser
+                     , Data.SemVer.Types
   build-depends:       base
                      , classy-prelude
                      , text
