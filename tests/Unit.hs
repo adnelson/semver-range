@@ -313,7 +313,7 @@ rangeTests = describe "range tests" $ do
         (True, "~>3.2.1", "3.2.2")
         ]
   forM_ testCases $ \(expectedMatchBool, range, version) -> do
-    let fail_ = expectationFailure
+    let fail = expectationFailure
     it (show version <> " satisfies range " <> show range) $ do
       case (parseSemVerRange range, parseSemVer version) of
         (Left err, _) -> fail $ "Semver range parse failed: " <> show err
